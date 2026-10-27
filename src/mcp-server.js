@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { TASK_TYPES, loadConfig, loadState, saveState, claimsToday } from './config.js';
+import { TASK_TYPES, NPX, loadConfig, loadState, saveState, claimsToday } from './config.js';
 import { GitHub, parseRepo } from './github.js';
 import { fetchRepoConfig, policyPath } from './repo-config.js';
 import { findTasks, taskTypeOf, needsOf, repoSearchQuery, TASK_LABEL } from './tasks.js';
@@ -279,7 +279,7 @@ export function createServer({ gh, config = loadConfig() } = {}) {
     _meta: ASK_EVERY_TIME,
   }, async ({ repo, issue }) => {
     if (!config.verify.allow_native_platform_tasks) {
-      return fail('Native checks are off. The user can turn them on by re-running `npx oss-tokens init` (or setting verify.allow_native_platform_tasks in ~/.oss-tokens/config.json).');
+      return fail(`Native checks are off. The user can turn them on by re-running \`${NPX} init\` (or setting verify.allow_native_platform_tasks in ~/.oss-tokens/config.json).`);
     }
     const t = await loadTask(repo, issue);
     if (!t.needs.length) return fail('This task has no ai-needs label, so it doesn\'t need this machine specifically. Use run_verify (sandboxed) instead.');

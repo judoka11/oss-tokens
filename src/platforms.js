@@ -2,7 +2,7 @@
 // entry without touching anything else in those files.
 import { existsSync, readFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { home, writeJson } from './config.js';
+import { home, writeJson, NPX } from './config.js';
 
 export const SERVER_NAME = 'oss-tokens';
 
@@ -92,7 +92,7 @@ export function writeSkill(workflowText) {
     'description: Donate agent time to an open source project through oss-tokens. Find a task a maintainer posted, do it in a sandboxed workspace, and post the result after the user approves. Use when the user wants to contribute to open source with their spare tokens.',
     '---',
     '',
-    'Use the tools from the `oss-tokens` MCP server (find_tasks, get_task, claim_task, get_instructions, prepare_workspace, run_verify, submit_result, release_task). If they are missing, tell the user to run `npx oss-tokens init` and restart Claude Code.',
+    `Use the tools from the \`oss-tokens\` MCP server (find_tasks, get_task, search_repo_issues, claim_task, get_instructions, prepare_workspace, run_verify, run_native_check, submit_result, release_task). If they are missing, tell the user to run \`${NPX} init\` and restart Claude Code.`,
     '',
     workflowText,
   ].join('\n');

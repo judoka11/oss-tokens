@@ -60,7 +60,7 @@ A tiny, realistic JavaScript library, so checks run in the cached `node:22-alpin
 2. **Donor setup (15 s):** `npx github:judoka11/oss-tokens init` → token → Claude Code → shows exactly which files it writes.
 3. **In Claude Code (60 s):** `/oss-task` → lists the 4 tasks → pick the repro → approve the claim prompt (claim comment appears on GitHub) → agent works in a temp clone → `run_verify` in Docker → agent shows the draft comment → approve → posted.
 4. **Result (15 s):** the issue on GitHub: AI-assisted label, model, ~token count, "reviewed by @judoka11", the repro. Maintainer reacts 👍.
-5. **Off switch (5 s):** `npx oss-tokens uninstall` removes everything.
+5. **Off switch (5 s):** `npx github:judoka11/oss-tokens uninstall` removes everything.
 
 ## Steps
 

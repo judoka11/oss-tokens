@@ -1,5 +1,7 @@
 // Minimal GitHub REST client. No gh CLI needed; a token is only required for
 // writing (claims and results). Reading public issues works without one.
+import { NPX } from './config.js';
+
 const API = 'https://api.github.com';
 const REPO_RE = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/;
 
@@ -49,7 +51,7 @@ export class GitHub {
       if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') {
         msg = this.token
           ? 'GitHub rate limit reached. Wait a few minutes and try again.'
-          : 'GitHub rate limit reached for anonymous requests. Add a GitHub token (npx oss-tokens init) to get a much higher limit.';
+          : `GitHub rate limit reached for anonymous requests. Add a GitHub token (${NPX} init) to get a much higher limit.`;
       }
       throw new GitHubError(msg, res.status);
     }
@@ -58,7 +60,7 @@ export class GitHub {
 
   requireToken(action) {
     if (!this.token) {
-      throw new GitHubError(`A GitHub token is needed to ${action}. Run \`npx oss-tokens init\` to add one.`, 401);
+      throw new GitHubError(`A GitHub token is needed to ${action}. Run \`${NPX} init\` to add one.`, 401);
     }
   }
 

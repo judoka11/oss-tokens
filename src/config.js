@@ -5,6 +5,9 @@ import { homedir } from 'node:os';
 
 export const TASK_TYPES = ['repro', 'triage', 'failing-test', 'docs'];
 
+// Not on npm (yet): users run it straight from GitHub.
+export const NPX = 'npx github:judoka11/oss-tokens';
+
 // Tests point this at a temp folder so they never touch the real home.
 export function home() {
   return process.env.OSS_TOKENS_TEST_HOME || homedir();

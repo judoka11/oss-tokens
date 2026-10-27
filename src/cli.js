@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
+import { NPX } from './config.js';
 
 const HELP = `oss-tokens: donate your coding agent's time to open source
 
 Usage:
-  npx oss-tokens init          set up for Claude Code, Cursor, OpenCode
-  npx oss-tokens uninstall     remove everything init added (--keep-config keeps settings)
-  npx oss-tokens find          list open tasks (--language Python --repo owner/name)
-  npx oss-tokens status        show your settings and history
-  npx oss-tokens mcp           run the MCP server (your AI tool does this)
+  ${NPX} init          set up for Claude Code, Cursor, OpenCode
+  ${NPX} uninstall     remove everything init added (--keep-config keeps settings)
+  ${NPX} find          list open tasks (--language Python --repo owner/name)
+  ${NPX} status        show your settings and history
+  ${NPX} mcp           run the MCP server (your AI tool does this)
+
+Newer version: npx caches GitHub installs, so add the version tag or #main,
+e.g. ${NPX}#main init
 
 init flags (for scripts): --yes --token <t> --tools claude-code,cursor
   --task-types repro,triage --languages Python --daily-limit 3 --allow-native

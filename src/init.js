@@ -5,7 +5,7 @@ import { existsSync, rmSync, cpSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { TASK_TYPES, dataDir, loadConfig, saveConfig, readJson, writeJson } from './config.js';
+import { TASK_TYPES, NPX, dataDir, loadConfig, saveConfig, readJson, writeJson } from './config.js';
 import { PLATFORMS, addEntry, removeEntry, writeSkill, skillDir, genericSnippet } from './platforms.js';
 import { VERSION, readInstructions } from './mcp-server.js';
 import { detectMachine, describeMachine } from './machine.js';
@@ -177,7 +177,8 @@ export async function runInit(flags = {}) {
   if (tools.includes('claude-code')) console.log('  Claude Code: type /oss-task');
   console.log('  Other tools: use the "do-task" prompt from the oss-tokens server, or ask "find me an oss-tokens task".');
   console.log('\nOther MCP tools can use this entry:\n' + genericSnippet(server));
-  console.log('\nRemove everything later with: npx oss-tokens uninstall\n');
+  console.log(`\nRemove everything later with:\n  ${NPX} uninstall`);
+  console.log(`or, without internet, with the copy installed here:\n  "${server.command}" "${server.args[0]}" uninstall\n`);
 }
 
 export async function runUninstall(flags = {}) {

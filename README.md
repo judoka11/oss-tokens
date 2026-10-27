@@ -31,7 +31,9 @@ Then restart your tool and:
 - **Claude Code:** `/oss-task`
 - **Other tools:** use the `do-task` prompt from the `oss-tokens` server, or ask your agent to "find an oss-tokens task".
 
-To see your history: `npx oss-tokens status`. To remove everything: `npx oss-tokens uninstall`.
+To see your history: `npx github:judoka11/oss-tokens status`. To remove everything: `npx github:judoka11/oss-tokens uninstall`.
+
+**Updating:** npx keeps the first copy it downloads from GitHub and won't fetch a newer one by itself. To get the latest version, add `#main` (or a version tag) and re-run init: `npx github:judoka11/oss-tokens#main init`. `init` prints the version it is running on its first line.
 
 ### What your agent can do
 
