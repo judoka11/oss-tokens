@@ -22,15 +22,27 @@ async function gh(method, path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok && !(res.status === 422 && path.endsWith('/labels'))) throw new Error(`${method} ${path}: ${res.status} ${data.message}`);
+  if (!res.ok && !(res.status === 422 && path.endsWith('/labels'))) {
+    const hint = {
+      401: 'GitHub rejected the token (typo, expired or deleted). Make a new one.',
+      403: 'The token is not allowed to do this, or you hit a rate limit.',
+      404: 'The token works but has no write access to this repo. Use a classic token with the "public_repo" scope (https://github.com/settings/tokens/new?scopes=public_repo&description=oss-tokens), or give a fine-grained token "Issues: read and write" on this repo.',
+    }[res.status] || '';
+    throw new Error(`${method} ${path}: ${res.status} ${data.message}${hint ? `\n${hint}` : ''}`);
+  }
   return data;
 }
 
 const base = `/repos/${spec.repo}`;
-for (const label of spec.labels) await gh('POST', `${base}/labels`, label); // 422 = exists already
-for (const issue of spec.issues) {
-  const created = await gh('POST', `${base}/issues`, { title: issue.title, body: issue.body, labels: issue.labels });
-  if (issue.maintainer_comment) await gh('POST', `${base}/issues/${created.number}/comments`, { body: issue.maintainer_comment });
-  if (issue.close) await gh('PATCH', `${base}/issues/${created.number}`, { state: 'closed', state_reason: issue.close });
-  console.log(`#${created.number} ${issue.title}`);
+try {
+  for (const label of spec.labels) await gh('POST', `${base}/labels`, label); // 422 = exists already
+  for (const issue of spec.issues) {
+    const created = await gh('POST', `${base}/issues`, { title: issue.title, body: issue.body, labels: issue.labels });
+    if (issue.maintainer_comment) await gh('POST', `${base}/issues/${created.number}/comments`, { body: issue.maintainer_comment });
+    if (issue.close) await gh('PATCH', `${base}/issues/${created.number}`, { state: 'closed', state_reason: issue.close });
+    console.log(`#${created.number} ${issue.title}`);
+  }
+} catch (err) {
+  console.error(`Error: ${err.message}`);
+  process.exitCode = 1;
 }
