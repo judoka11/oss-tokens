@@ -6,7 +6,7 @@ import { join, dirname, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { TASK_TYPES, NPX, dataDir, loadConfig, saveConfig, readJson, writeJson } from './config.js';
-import { PLATFORMS, addEntry, removeEntry, writeSkill, skillDir, genericSnippet } from './platforms.js';
+import { PLATFORMS, SKILLS, addEntry, removeEntry, writeSkill, skillDir, genericSnippet } from './platforms.js';
 import { VERSION, readInstructions } from './mcp-server.js';
 import { detectMachine, describeMachine } from './machine.js';
 
@@ -142,7 +142,7 @@ export async function runInit(flags = {}) {
   // 4. Confirm
   const plan = [
     ...tools.map(id => `${PLATFORMS[id].file()}  (add "oss-tokens" MCP server for ${PLATFORMS[id].label})`),
-    ...(tools.includes('claude-code') ? [`${join(skillDir(), 'SKILL.md')}  (/oss-task skill)`] : []),
+    ...(tools.includes('claude-code') ? Object.keys(SKILLS).map(name => `${join(skillDir(name), 'SKILL.md')}  (/${name} skill)`) : []),
     `${join(dataDir(), 'config.json')}  (your settings${token ? ' and token' : ''})`,
     `${manifestFile()}  (list of changes, for uninstall)`,
   ];
@@ -163,7 +163,9 @@ export async function runInit(flags = {}) {
       console.log(`✗ ${PLATFORMS[id].label}: ${err.message}\n${genericSnippet(server)}`);
     }
   }
-  const skill = tools.includes('claude-code') ? writeSkill(readInstructions('workflow')) : null;
+  const skills = tools.includes('claude-code')
+    ? Object.entries(SKILLS).map(([name, s]) => writeSkill(name, readInstructions(s.instructions)))
+    : [];
   saveConfig({
     ...current, github_token: token, task_types: taskTypes, languages, daily_task_limit: dailyLimit, github_login: login,
     machine, verify: { ...current.verify, allow_native_platform_tasks: !!allowNative },
@@ -171,10 +173,11 @@ export async function runInit(flags = {}) {
 
   const previous = readJson(manifestFile(), { changes: [] });
   const merged = [...previous.changes.filter(c => !changes.some(n => n.file === c.file)), ...changes];
-  writeJson(manifestFile(), { version: VERSION, installed_at: new Date().toISOString(), server, changes: merged, skill_dir: skill || previous.skill_dir || null, pkg_dir: server.pkgDir });
+  const skillDirs = [...new Set([...(previous.skill_dirs || []), ...(previous.skill_dir ? [previous.skill_dir] : []), ...skills])];
+  writeJson(manifestFile(), { version: VERSION, installed_at: new Date().toISOString(), server, changes: merged, skill_dirs: skillDirs, pkg_dir: server.pkgDir });
 
   console.log(`\n✓ Done. Restart your AI tool, then:`);
-  if (tools.includes('claude-code')) console.log('  Claude Code: type /oss-task');
+  if (tools.includes('claude-code')) console.log('  Claude Code: type /oss-task, or /oss-practice to try any public issue without posting');
   console.log('  Other tools: use the "do-task" prompt from the oss-tokens server, or ask "find me an oss-tokens task".');
   console.log('\nOther MCP tools can use this entry:\n' + genericSnippet(server));
   console.log(`\nRemove everything later with:\n  ${NPX} uninstall`);
@@ -194,8 +197,9 @@ export async function runUninstall(flags = {}) {
       console.log(`✗ ${change.file}: ${err.message}`);
     }
   }
-  const skill = manifest?.skill_dir || skillDir();
-  if (existsSync(skill)) {
+  const skillDirs = new Set([...(manifest?.skill_dirs || []), ...(manifest?.skill_dir ? [manifest.skill_dir] : []), ...Object.keys(SKILLS).map(name => skillDir(name))]);
+  for (const skill of skillDirs) {
+    if (!existsSync(skill)) continue;
     rmSync(skill, { recursive: true, force: true });
     console.log(`✓ removed ${skill}`);
   }

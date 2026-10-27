@@ -1,7 +1,7 @@
 // End-to-end over MCP against an in-memory fake GitHub.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -60,12 +60,12 @@ beforeEach(() => {
 test('lists all tools and the do-task prompt', async () => {
   const { client } = await connect(fakeGitHub());
   const { tools } = await client.listTools();
-  assert.deepEqual(tools.map(t => t.name).sort(), ['claim_task', 'find_tasks', 'get_instructions', 'get_task', 'my_contributions', 'prepare_workspace', 'release_task', 'run_native_check', 'run_verify', 'search_repo_issues', 'submit_result']);
+  assert.deepEqual(tools.map(t => t.name).sort(), ['claim_task', 'find_tasks', 'get_instructions', 'get_task', 'my_contributions', 'practice_get_task', 'practice_run', 'practice_save', 'practice_workspace', 'prepare_workspace', 'release_task', 'run_native_check', 'run_verify', 'search_repo_issues', 'submit_result']);
   for (const name of ['claim_task', 'submit_result', 'release_task', 'run_native_check']) {
     assert.equal(tools.find(t => t.name === name)._meta['anthropic/requiresUserInteraction'], true, name);
   }
   const { prompts } = await client.listPrompts();
-  assert.equal(prompts[0].name, 'do-task');
+  assert.deepEqual(prompts.map(p => p.name).sort(), ['do-task', 'practice-task']);
 });
 
 test('issue text reaches the agent fenced as untrusted', async () => {
@@ -209,6 +209,31 @@ test('a task with a result is refused unless it is a second opinion', async () =
   assert.match(refused.text, /already has a result from @earlier/);
   const second = await call('claim_task', { repo: 'o/r', issue: 7, second_opinion: true });
   assert.equal(second.isError, false, second.text);
+});
+
+test('practice mode reads any repo and saves locally without posting', async () => {
+  const gh = fakeGitHub({ repoConfig: null, issueLabels: ['needs reproduction'] }); // no opt-in file
+  gh.createComment = async () => { throw new Error('practice mode must never post'); };
+  const { call } = await connect(gh, { github_login: 'donor' });
+
+  const task = await call('practice_get_task', { repo: 'pytorch/pytorch', issue: 7 });
+  assert.equal(task.isError, false, task.text);
+  assert.match(task.text, /PRACTICE: pytorch\/pytorch#7 \(nothing will be posted\)/);
+  assert.match(task.text, /<<<UNTRUSTED ISSUE TITLE AND BODY/);
+
+  const saved = await call('practice_save', { repo: 'pytorch/pytorch', issue: 7, task_type: 'repro', summary_markdown: '**Reproduced:** yes, on 2.13 CPU', model: 'm', estimated_tokens: 9000 });
+  assert.equal(saved.isError, false, saved.text);
+  const file = saved.text.match(/Saved \(not posted\): (.+)/)[1];
+  const content = readFileSync(file, 'utf8');
+  assert.match(content, /Practice result, not posted\.\*\* Issue: https:\/\/github\.com\/pytorch\/pytorch\/issues\/7/);
+  assert.match(content, /oss-tokens:result v1[\s\S]*Checks ran in: not executed[\s\S]*Reproduced:\*\* yes, on 2\.13 CPU/);
+});
+
+test('practice runs refuse odd image names', async () => {
+  const { call } = await connect(fakeGitHub());
+  const r = await call('practice_run', { repo: 'o/r', issue: 1, image: 'evil; rm -rf /', command: 'true' });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /Not a valid Docker image name/);
 });
 
 test('daily limit is enforced', async () => {

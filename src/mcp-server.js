@@ -6,15 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { TASK_TYPES, NPX, loadConfig, loadState, saveState, claimsToday } from './config.js';
+import { TASK_TYPES, NPX, loadConfig, loadState, saveState, claimsToday, dataDir } from './config.js';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { GitHub, parseRepo } from './github.js';
 import { fetchRepoConfig, policyPath } from './repo-config.js';
 import { findTasks, taskTypeOf, needsOf, repoSearchQuery, resultsIn, TASK_LABEL } from './tasks.js';
 import { basicMachine, describeMachine, unmetNeeds } from './machine.js';
 import { taskOwner, activeClaims, claimComment, releaseComment, resultComment } from './claims.js';
 import { untrusted } from './untrusted.js';
-import { prepareWorkspace, workspacePath, workspacePatch } from './workspace.js';
-import { runVerify, runNative } from './verify.js';
+import { prepareWorkspace, workspacePath, workspacePatch, preparePracticeWorkspace, practicePath, diffOf } from './workspace.js';
+import { runVerify, runNative, runInDocker } from './verify.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
@@ -386,6 +387,115 @@ export function createServer({ gh, config = loadConfig() } = {}) {
     if (active.length) lines.push('', 'Active claims:', ...active.map(c => `- ${c.repo}#${c.issue} [${c.task_type}] since ${c.claimed_at}`));
     return text(lines.join('\n'));
   });
+
+  // ---- Practice mode: any public issue, nothing posted. ----
+
+  tool('practice_get_task', {
+    title: 'Read any issue (practice)',
+    description: 'PRACTICE MODE. Read any public GitHub issue and its comments, even in repos that have not opted in to oss-tokens. Nothing is posted in practice mode. Read-only.',
+    inputSchema: { repo: repoArg, issue: issueArg },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  }, async ({ repo, issue }) => {
+    const { full } = parseRepo(repo);
+    const [data, comments] = await Promise.all([gh.getIssue(full, issue), gh.listComments(full, issue)]);
+    if (data.pull_request) return fail(`${full}#${issue} is a pull request.`);
+    const labels = (data.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+    const recent = comments.slice(-10).map(c => `@${c.user?.login} (${c.created_at}):\n${String(c.body || '').slice(0, 3000)}`).join('\n\n---\n\n');
+    return text([
+      `# PRACTICE: ${full}#${issue} (nothing will be posted)`,
+      `URL: ${data.html_url} · state: ${data.state} · labels: ${labels.join(', ') || 'none'}${data.created_at ? ` · opened ${data.created_at.slice(0, 10)}` : ''}`,
+      `This machine: ${describeMachine(machine)}. Practice runs happen in Docker (Linux).`,
+      '',
+      '## Issue',
+      untrusted('issue title and body', `${data.title}\n\n${String(data.body || '(empty)').slice(0, 20000)}`),
+      '',
+      `## Comments (${comments.length}, last 10 shown)`,
+      comments.length ? untrusted('issue comments', recent) : '(none)',
+      '',
+      'Next: get_instructions for the task type (usually repro), then practice_workspace.',
+    ].join('\n'));
+  });
+
+  tool('practice_workspace', {
+    title: 'Scratch folder (practice)',
+    description: 'PRACTICE MODE. Create a scratch folder for this issue in the system temp directory. Leave clone off for big projects: reproducing a bug in a released version only needs the published package.',
+    inputSchema: { repo: repoArg, issue: issueArg, clone: z.boolean().optional().describe('Shallow-clone the repo into the folder (small repos only). Default false.') },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  }, async ({ repo, issue, clone }) => {
+    const { path, reused, cloned } = await preparePracticeWorkspace(repo, issue, { clone: !!clone });
+    return text([
+      `Practice workspace ${reused ? 'already existed' : 'ready'}${cloned ? ' (with a clone of the repo)' : ' (empty)'}: ${path}`,
+      'Write your repro files here. Never run them in your own terminal: use practice_run, which runs them in Docker with only this folder mounted.',
+    ].join('\n'));
+  });
+
+  tool('practice_run', {
+    title: 'Run in Docker (practice)',
+    description: 'PRACTICE MODE. Run a command in a Docker container with the practice workspace mounted at /work (and nothing else of this machine). Pick an official image, e.g. "python:3.12". pip/npm downloads are cached between runs. Returns pass/fail and the tail of the output.',
+    inputSchema: {
+      repo: repoArg,
+      issue: issueArg,
+      image: z.string().min(1).max(200).describe('Docker image, e.g. "python:3.12" or "node:22-alpine".'),
+      command: z.string().min(1).max(2000).describe('Shell command run in /work, e.g. "pip install torch --index-url https://download.pytorch.org/whl/cpu && python repro.py".'),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+  }, async ({ repo, issue, image, command }) => {
+    const { full } = parseRepo(repo);
+    const r = await runInDocker({ dir: practicePath(full, issue), image, command });
+    lastCheck.set(`practice:${full}#${issue}`, `Docker (${image}, Linux)`);
+    return text([
+      `${r.passed ? 'EXIT 0' : `EXIT ${r.exitCode}`} · sandbox: docker (${image})`,
+      untrusted('command output', r.output),
+    ].join('\n'));
+  });
+
+  tool('practice_save', {
+    title: 'Save the result (practice)',
+    description: 'PRACTICE MODE. Save the finished result to a Markdown file on this machine, formatted exactly as it would be posted. Nothing is sent to GitHub. Show the user the text first.',
+    inputSchema: {
+      repo: repoArg,
+      issue: issueArg,
+      task_type: z.enum(TASK_TYPES),
+      summary_markdown: z.string().min(20).max(20000).describe('The result, in the format from get_instructions.'),
+      model: z.string().min(1).max(80),
+      estimated_tokens: z.number().int().min(0),
+      include_patch: z.boolean().optional().describe('Attach a diff of the workspace (only if it was created with clone: true).'),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+  }, async ({ repo, issue, task_type, summary_markdown, model, estimated_tokens, include_patch }) => {
+    const { full, owner, name } = parseRepo(repo);
+    const login = config.github_login || (config.github_token ? await me().catch(() => 'you') : 'you');
+    const patch = include_patch ? await diffOf(practicePath(full, issue)) : '';
+    const body = resultComment({
+      login, taskType: task_type, model, estimatedTokens: estimated_tokens, summary: summary_markdown, patch,
+      donorMachine: describeMachine(machine),
+      checkedIn: lastCheck.get(`practice:${full}#${issue}`) || 'not executed (reasoned from the code)',
+    });
+    const dir = join(dataDir(), 'practice');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `${owner}__${name}__${issue}.md`);
+    writeFileSync(file, [
+      `<!-- PRACTICE RESULT: not posted -->`,
+      `**Practice result, not posted.** Issue: https://github.com/${full}/issues/${issue} · saved ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`,
+      '',
+      '---',
+      '',
+      body,
+      '',
+    ].join('\n'), 'utf8');
+    return text(`Saved (not posted): ${file}\nTell the user the path. Nothing was sent to GitHub.`);
+  });
+
+  server.registerPrompt('practice-task', {
+    title: 'Practice on any issue (nothing posted)',
+    description: 'Try oss-tokens on a real issue of any public repo, sandboxed, and save the result locally instead of posting it.',
+    argsSchema: { task: z.string().optional().describe('Optional: owner/repo#123') },
+  }, ({ task }) => ({
+    messages: [{
+      role: 'user',
+      content: { type: 'text', text: `${readInstructions('practice')}\n\n${task ? `The user picked: ${task}` : 'Ask the user which issue to practice on.'}` },
+    }],
+  }));
 
   server.registerPrompt('do-task', {
     title: 'Donate time to an open source task',

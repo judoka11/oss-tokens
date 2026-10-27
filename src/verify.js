@@ -33,10 +33,15 @@ export async function dockerAvailable() {
   }
 }
 
-export function dockerArgs({ dir, image, command }) {
+// The cache volume keeps pip/npm downloads between runs (e.g. a 200 MB
+// PyTorch wheel). It is a Docker-managed volume, not a folder of the donor's.
+export const CACHE_VOLUME = 'oss-tokens-cache';
+
+export function dockerArgs({ dir, image, command, cache = false }) {
   return [
     'run', '--rm',
     '-v', `${dir}:/work`,
+    ...(cache ? ['-v', `${CACHE_VOLUME}:/root/.cache`, '-e', 'npm_config_cache=/root/.cache/npm'] : []),
     '-w', '/work',
     '--memory', '2g', '--cpus', '2', '--pids-limit', '512',
     '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
@@ -72,6 +77,21 @@ export async function runVerify({ dir, verify, allowUnsandboxed = false, timeout
     throw new Error('Docker is not running, and oss-tokens will not run a stranger\'s test command directly on this machine. Start Docker, or set verify.allow_unsandboxed to true in ~/.oss-tokens/config.json if you accept the risk.');
   }
   return runNative({ dir, command: verify.command, timeoutMs });
+}
+
+// Practice mode: the agent picks the image and command (there's no repo
+// config). Still Docker-only, with only the scratch folder mounted.
+export const IMAGE_RE = /^[a-z0-9][a-z0-9._\/:@-]{0,200}$/;
+
+export async function runInDocker({ dir, image, command, timeoutMs = 30 * 60_000 }) {
+  if (!IMAGE_RE.test(image)) throw new Error(`Not a valid Docker image name: ${image}`);
+  if (!(await dockerAvailable())) throw new Error('Docker is not running. Practice runs only happen inside Docker.');
+  try {
+    const { stdout, stderr } = await run('docker', dockerArgs({ dir, image, command, cache: true }), { timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 });
+    return { passed: true, exitCode: 0, sandbox: 'docker', image, output: tail(stdout + stderr) };
+  } catch (err) {
+    return { passed: false, exitCode: err.code ?? null, sandbox: 'docker', image, output: tail((err.stdout || '') + (err.stderr || '') || err.message) };
+  }
 }
 
 // Variables a build or test run needs; everything else (tokens, API keys,

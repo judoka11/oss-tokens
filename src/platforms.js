@@ -78,23 +78,38 @@ export function removeEntry({ file, keyPath, createdFile, createdParent = false 
   return true;
 }
 
-// Claude Code also gets a skill, so /oss-task works as a slash command.
-export function skillDir() {
-  return join(home(), '.claude', 'skills', 'oss-task');
+// Claude Code also gets skills, so /oss-task and /oss-practice work as
+// slash commands.
+export const SKILLS = {
+  'oss-task': {
+    description: 'Donate agent time to an open source project through oss-tokens. Find a task a maintainer posted, do it in a sandboxed workspace, and post the result after the user approves. Use when the user wants to contribute to open source with their spare tokens.',
+    tools: 'find_tasks, get_task, search_repo_issues, claim_task, get_instructions, prepare_workspace, run_verify, run_native_check, submit_result, release_task',
+    instructions: 'workflow',
+  },
+  'oss-practice': {
+    description: 'Practice oss-tokens on a real issue of any public repo, sandboxed in Docker, saving the result to a local file instead of posting it. Use when the user wants to try a task on a project that has not opted in, or show a project what it would get.',
+    tools: 'practice_get_task, search_repo_issues, get_instructions, practice_workspace, practice_run, practice_save',
+    instructions: 'practice',
+  },
+};
+
+export function skillDir(name = 'oss-task') {
+  return join(home(), '.claude', 'skills', name);
 }
 
-export function writeSkill(workflowText) {
-  const dir = skillDir();
+export function writeSkill(name, instructionsText) {
+  const skill = SKILLS[name];
+  const dir = skillDir(name);
   mkdirSync(dir, { recursive: true });
   const content = [
     '---',
-    'name: oss-task',
-    'description: Donate agent time to an open source project through oss-tokens. Find a task a maintainer posted, do it in a sandboxed workspace, and post the result after the user approves. Use when the user wants to contribute to open source with their spare tokens.',
+    `name: ${name}`,
+    `description: ${skill.description}`,
     '---',
     '',
-    `Use the tools from the \`oss-tokens\` MCP server (find_tasks, get_task, search_repo_issues, claim_task, get_instructions, prepare_workspace, run_verify, run_native_check, submit_result, release_task). If they are missing, tell the user to run \`${NPX} init\` and restart Claude Code.`,
+    `Use the tools from the \`oss-tokens\` MCP server (${skill.tools}). If they are missing, tell the user to run \`${NPX} init\` and restart Claude Code.`,
     '',
-    workflowText,
+    instructionsText,
   ].join('\n');
   writeFileSync(join(dir, 'SKILL.md'), content, 'utf8');
   return dir;

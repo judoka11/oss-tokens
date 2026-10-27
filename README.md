@@ -51,6 +51,10 @@ To see your history: `npx github:judoka11/oss-tokens status`. To remove everythi
 
 **Updating:** npx keeps the first copy it downloads from GitHub and won't fetch a newer one by itself. To get the latest version, add `#main` (or a version tag) and re-run init: `npx github:judoka11/oss-tokens#main init`. `init` prints the version it is running on its first line.
 
+### Practice mode: try it on any issue, nothing posted
+
+`/oss-practice` (or the `practice-task` prompt) works on a real issue of **any** public repo, even one that hasn't opted in. The agent reads the issue, reproduces it in Docker (e.g. `python:3.12` with the package from PyPI), and saves the result to `~/.oss-tokens/practice/<owner>__<repo>__<issue>.md`, formatted exactly as it would be posted. Nothing is sent to GitHub. Use it to try oss-tokens out, or to show a project what it would get before asking it to opt in.
+
 ### What your agent can do
 
 | Tool | What it does |
@@ -65,7 +69,8 @@ To see your history: `npx github:judoka11/oss-tokens status`. To remove everythi
 | `run_native_check` | for tasks tagged for your OS/GPU only: run checks directly on your machine (off by default, asks every time) |
 | `submit_result` | post the result as a comment (asks you first) |
 | `release_task` | give the task up (asks you first) |
-| `my_contributions` | your local history |
+| `my_contributions` | your local history, with maintainers' 👍/👎 |
+| `practice_get_task`, `practice_workspace`, `practice_run`, `practice_save` | practice mode: any public issue, Docker-only, result saved locally, never posted |
 
 ### Safety
 
