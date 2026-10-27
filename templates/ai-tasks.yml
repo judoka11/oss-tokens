@@ -1,0 +1,26 @@
+# Opt this repo in to oss-tokens: donated AI agent time from the community.
+# Spec: https://github.com/<you>/oss-tokens/blob/main/SPEC.md
+version: 1
+ai_help: true
+
+policy: CONTRIBUTING.md
+
+# repro | triage | failing-test | docs
+allowed_tasks: [repro, triage]
+
+# none | draft-only | allowed   (only "none" is supported in v1)
+pull_requests: none
+
+# standard | quoted   (quoted: donor's own words first, AI output as a marked quote)
+result_format: standard
+
+# Optional sandboxed check, run in Docker on the donor's machine.
+# verify:
+#   image: node:22
+#   command: npm ci && npm test
+
+limits:
+  per_donor_open: 1
+  claim_hours: 24
+
+# notes: Anything agents should know about this repo.

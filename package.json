@@ -1,0 +1,40 @@
+{
+  "name": "oss-tokens",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Let open source repos post AI-friendly tasks, and let people donate their own coding agent's time to them. Works over MCP with Claude Code, Cursor, OpenCode and more.",
+  "bin": {
+    "oss-tokens": "src/cli.js"
+  },
+  "main": "./src/mcp-server.js",
+  "files": [
+    "src/",
+    "!src/**/*.test.js",
+    "instructions/",
+    "templates/",
+    "SPEC.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node src/cli.js mcp",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mcp",
+    "open-source",
+    "ai",
+    "claude-code",
+    "cursor",
+    "opencode",
+    "contributions"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  }
+}

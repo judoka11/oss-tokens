@@ -1,0 +1,46 @@
+{
+  "repo": "judoka11/oss-tokens-demo",
+  "labels": [
+    { "name": "ai-help-wanted", "color": "7057ff", "description": "Open to donated AI agent time (oss-tokens)" },
+    { "name": "ai:repro", "color": "c5def5", "description": "oss-tokens task: reproduce a bug" },
+    { "name": "ai:triage", "color": "c5def5", "description": "oss-tokens task: triage" },
+    { "name": "ai:failing-test", "color": "c5def5", "description": "oss-tokens task: write a failing test" },
+    { "name": "ai:docs", "color": "c5def5", "description": "oss-tokens task: fix docs" },
+    { "name": "ai-needs:windows", "color": "fbca04", "description": "Only reproduces on Windows" },
+    { "name": "bug", "color": "d73a4a", "description": "" }
+  ],
+  "issues": [
+    {
+      "title": "Accented characters turn into dashes",
+      "body": "`slugify('Café au lait')` gives `caf-au-lait`. I expected `cafe-au-lait`.",
+      "labels": ["bug"],
+      "close": "not_planned",
+      "maintainer_comment": "This is by design: accents are dropped unless you pass `transliterate: true`, which gives `cafe-au-lait`. It's off by default so slugs stay predictable for scripts that don't transliterate well. Closing, but happy to make the README clearer."
+    },
+    {
+      "title": "Blog crashes when a post title is only emoji",
+      "body": "Someone posted a title that was just 🎉🎉🎉 and our blog's build fell over. We use tiny-slug 1.2.0 to make the URLs. The error said something about `toLowerCase` but I didn't keep the log, sorry. Happens every time with that post.",
+      "labels": ["bug", "ai-help-wanted", "ai:repro"]
+    },
+    {
+      "title": "Slugs lose accented letters (é, ü, ñ)",
+      "body": "Titles in French and Spanish come out broken: `Crème Brûlée` becomes `cr-me-br-l-e` and `Mañana` becomes `ma-ana`. This makes our URLs unreadable. Is this a bug?",
+      "labels": ["ai-help-wanted", "ai:triage"]
+    },
+    {
+      "title": "Custom separator leaves underscores at the start and end",
+      "body": "With `separator: '_'`, `slugify('Hello World!', { separator: '_' })` returns `hello_world_` with a trailing underscore, and `slugify('¡Hola!', { separator: '_' })` returns `_hola_`. With the default `-` it's fine.\n\nThere's no test covering custom separators. Could someone add a test that pins this down, so whoever fixes it can see when it's done?",
+      "labels": ["bug", "ai-help-wanted", "ai:failing-test"]
+    },
+    {
+      "title": "README example for truncation doesn't work",
+      "body": "The README says `slugify('A very long title for a blog post', { maxLen: 20 })` returns `'a-very-long-title'`, but I get the whole thing back: `a-very-long-title-for-a-blog-post`. Am I doing something wrong?",
+      "labels": ["ai-help-wanted", "ai:docs"]
+    },
+    {
+      "title": "fileSlug includes folder names on Windows",
+      "body": "On my Windows laptop, `fileSlug(path.join('posts', 'Hello World.md'))` returns `posts-hello-world` instead of `hello-world`. Our Linux CI is green, so maybe it's something about my setup? Node 22, Windows 11.",
+      "labels": ["bug", "ai-help-wanted", "ai:repro", "ai-needs:windows"]
+    }
+  ]
+}

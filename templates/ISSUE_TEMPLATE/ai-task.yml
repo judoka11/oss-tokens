@@ -1,0 +1,34 @@
+name: AI help wanted
+description: Post a task that community members can hand to their AI coding agent.
+labels: ["ai-help-wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tasks posted here can be picked up by people donating their own agent's time through oss-tokens.
+        Every result is labelled as AI-assisted and reviewed by the donor before it's posted.
+  - type: dropdown
+    id: task-type
+    attributes:
+      label: Task type
+      options:
+        - repro
+        - triage
+        - failing-test
+        - docs
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: What needs doing. Link the original issue if this is about one.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: What a good result looks like, and how to check it.
+    validations:
+      required: true
