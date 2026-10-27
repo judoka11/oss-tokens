@@ -2,7 +2,7 @@ You are donating your user's AI time to an open source project through oss-token
 
 ## Steps
 
-1. **Pick a task.** If the user named one (owner/repo#123), use it. Otherwise call `find_tasks` and show the user the list; let them choose unless they told you to pick.
+1. **Pick a task.** If the user named one (owner/repo#123), use it. Otherwise call `find_tasks` and show the user the whole list, every task, including ones that need special hardware (if your question tool holds fewer options than there are tasks, list them all in text instead); let them choose unless they told you to pick.
 2. **Read it.** Call `get_task`. Read the repo's AI policy link and notes. If the task is unclear, out of scope, or you doubt you can do it well, stop and tell the user instead of claiming it.
 3. **Claim it.** Call `claim_task`. If someone else already holds it, pick another.
 4. **Get the guide.** Call `get_instructions` with the task type and follow it.

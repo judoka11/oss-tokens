@@ -63,13 +63,20 @@ export function releaseComment({ login, reason }) {
 // format "standard": the AI-written summary is the body; an optional note
 // from the donor goes first. format "quoted": the donor's own words are the
 // body and the AI output is a clearly marked quote under them.
-export function resultComment({ login, taskType, model, estimatedTokens, summary, patch, humanSummary = '', format = 'standard', ranOn = '' }) {
+// donorMachine: where the agent ran. checkedIn: where the project's code
+// actually ran (a Linux container is not the donor's Windows machine).
+export function resultComment({ login, taskType, model, estimatedTokens, summary, patch, humanSummary = '', format = 'standard', donorMachine = '', checkedIn = '' }) {
   const tokens = estimatedTokens ? ` · ~${formatTokens(estimatedTokens)} tokens` : '';
   const human = humanSummary.trim();
+  const where = [
+    donorMachine && `Donor machine: ${oneLine(donorMachine, 120)}`,
+    checkedIn && `Checks ran in: ${oneLine(checkedIn, 120)}`,
+  ].filter(Boolean).join(' · ');
   const parts = [
     marker('result'),
     `> 🤖 **AI-assisted contribution** via [oss-tokens](${TOOL_URL}) · task: \`${taskType}\` · model: \`${oneLine(model, 80)}\`${tokens}`,
-    `> Made by an AI agent on @${login}'s machine and reviewed by them before posting.${ranOn ? ` Ran on: ${oneLine(ranOn, 120)}.` : ''}`,
+    `> Made by an AI agent on @${login}'s machine and reviewed by them before posting.`,
+    ...(where ? [`> ${where}`] : []),
     '',
   ];
   if (format === 'quoted') {

@@ -184,7 +184,7 @@ test('quoted repos need the donor\'s own summary, and the AI text is quoted', as
   const body = gh.comments.at(-1).body;
   assert.match(body, /\*\*@donor:\*\* Checked it myself/);
   assert.match(body, /AI-generated analysis \(quoted\)[\s\S]*> \*\*Summary:\*\* crash on empty config\n> line two/);
-  assert.match(body, /Ran on: linux 6\.1 x64/);
+  assert.match(body, /> Donor machine: linux 6\.1 x64 · GPU: none detected · Checks ran in: not executed \(reasoned from the code\)/);
 });
 
 test('my_contributions shows maintainers\' reactions', async () => {

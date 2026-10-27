@@ -1,6 +1,6 @@
 {
   "name": "oss-tokens",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Let open source repos post AI-friendly tasks, and let people donate their own coding agent's time to them. Works over MCP with Claude Code, Cursor, OpenCode and more.",
   "bin": {

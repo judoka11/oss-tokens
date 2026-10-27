@@ -38,6 +38,8 @@ export function createServer({ gh, config = loadConfig() } = {}) {
   const machine = config.machine || basicMachine();
   const server = new McpServer({ name: 'oss-tokens', version: VERSION });
   let viewerLogin = null;
+  // Where each task's checks last ran, for the result header.
+  const lastCheck = new Map();
 
   async function me() {
     if (!viewerLogin) viewerLogin = (await gh.viewer()).login;
@@ -262,6 +264,7 @@ export function createServer({ gh, config = loadConfig() } = {}) {
     const cfg = await fetchRepoConfig(gh, full);
     if (!cfg.ok) return fail(`${full}: ${cfg.error}`);
     const r = await runVerify({ dir: workspacePath(full, issue), verify: cfg.config.verify, allowUnsandboxed: config.verify.allow_unsandboxed });
+    lastCheck.set(`${full}#${issue}`, r.sandbox === 'docker' ? `Docker (${r.image}, Linux)` : `directly on the donor machine, no sandbox`);
     return text([
       `${r.passed ? 'PASSED' : 'FAILED'} (exit ${r.exitCode}) · sandbox: ${r.sandbox}${r.image ? ` (${r.image})` : ''}`,
       untrusted('command output', r.output),
@@ -283,6 +286,7 @@ export function createServer({ gh, config = loadConfig() } = {}) {
     if (t.unmet.length) return fail(`This task ${t.unmet.join('; ')}; this machine is ${describeMachine(machine)}.`);
     if (!t.cfg.verify?.command) return fail('This repo has no verify command in its ai-tasks.yml.');
     const r = await runNative({ dir: workspacePath(t.full, issue), command: t.cfg.verify.command });
+    lastCheck.set(`${t.full}#${issue}`, `directly on the donor machine (${machine.os}), no sandbox`);
     return text([
       `${r.passed ? 'PASSED' : 'FAILED'} (exit ${r.exitCode}) · ran natively on ${describeMachine(machine)}`,
       untrusted('command output', r.output),
@@ -317,7 +321,9 @@ export function createServer({ gh, config = loadConfig() } = {}) {
     if (include_patch && !patch) return fail('include_patch was set but the workspace has no changes.');
     const body = resultComment({
       login, taskType: t.type, model, estimatedTokens: estimated_tokens, summary: summary_markdown, patch,
-      humanSummary: human_summary || '', format, ranOn: describeMachine(machine),
+      humanSummary: human_summary || '', format,
+      donorMachine: describeMachine(machine),
+      checkedIn: lastCheck.get(`${t.full}#${issue}`) || 'not executed (reasoned from the code)',
     });
     if (body.length > 65000) return fail('The comment is too long for GitHub. Shorten the summary or drop the patch.');
     const posted = await gh.createComment(t.full, issue, body);
