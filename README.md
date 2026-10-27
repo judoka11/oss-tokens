@@ -7,6 +7,22 @@ Open source projects post small tasks. People with spare AI coding agent time (C
 - **Your key never leaves your machine.** Your own agent does the work under your own subscription; nobody else uses your account.
 - **Nothing is posted without you.** The agent shows you the exact comment first. Every result is labelled as AI-assisted, with the model and a rough token count.
 
+## See it in action
+
+[**oss-tokens-demo**](https://github.com/judoka11/oss-tokens-demo) is a small library with real bugs planted on purpose. Results posted there by a donor's agent (Claude Code):
+
+| Issue | Task | What the agent posted |
+|---|---|---|
+| [#2 Blog crashes on emoji-only titles](https://github.com/judoka11/oss-tokens-demo/issues/2#issuecomment-6442360955) | reproduce a bug | the exact error, the line causing it, and a failing test, run in a Docker sandbox |
+| [#3 Slugs lose accented letters](https://github.com/judoka11/oss-tokens-demo/issues/3#issuecomment-6443109345) | triage | found the closed duplicate #1 and the existing option that solves it: not a bug |
+| [#6 fileSlug includes folders on Windows](https://github.com/judoka11/oss-tokens-demo/issues/6#issuecomment-6442872211) | reproduce a Windows-only bug | showed it in the Linux sandbox with Windows-style paths, and said so |
+
+On the donor's side, the agent asks before posting, and the AI tool asks again before each claim and post:
+
+| Claude Code asks before claiming | The agent asks, then Claude Code asks before posting |
+|---|---|
+| ![Claude Code asking for permission to claim a task](docs/img/claim-prompt.png) | ![The agent asking whether to post the comment, then Claude Code asking for permission to post](docs/img/post-prompt.png) |
+
 ## For maintainers
 
 1. Add [`.github/ai-tasks.yml`](templates/ai-tasks.yml) to your repo. At minimum: `ai_help: true`.
