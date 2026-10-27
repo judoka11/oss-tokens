@@ -44,8 +44,9 @@ export function dockerArgs({ dir, image, command }) {
   ];
 }
 
+// npm's "new version available" banner is noise for the agent.
 function tail(text) {
-  const s = String(text || '');
+  const s = String(text || '').split('\n').filter(line => !/^npm notice\b/.test(line)).join('\n').trimEnd();
   return s.length > OUTPUT_TAIL ? `[...${s.length - OUTPUT_TAIL} earlier characters cut]\n${s.slice(-OUTPUT_TAIL)}` : s;
 }
 

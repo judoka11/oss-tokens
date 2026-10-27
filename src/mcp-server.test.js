@@ -198,6 +198,19 @@ test('my_contributions shows maintainers\' reactions', async () => {
   assert.match((await call('my_contributions')).text, /\(comment deleted\)/);
 });
 
+test('a task with a result is refused unless it is a second opinion', async () => {
+  const gh = fakeGitHub();
+  await gh.createComment('o/r', 7, '<!-- oss-tokens:result v1 -->\nReproduced: yes', 'earlier');
+  const { call } = await connect(gh);
+  const task = await call('get_task', { repo: 'o/r', issue: 7 });
+  assert.match(task.text, /Results already posted: @earlier/);
+  const refused = await call('claim_task', { repo: 'o/r', issue: 7 });
+  assert.equal(refused.isError, true);
+  assert.match(refused.text, /already has a result from @earlier/);
+  const second = await call('claim_task', { repo: 'o/r', issue: 7, second_opinion: true });
+  assert.equal(second.isError, false, second.text);
+});
+
 test('daily limit is enforced', async () => {
   const { call } = await connect(fakeGitHub(), { daily_task_limit: 1 });
   assert.equal((await call('claim_task', { repo: 'o/r', issue: 7 })).isError, false);

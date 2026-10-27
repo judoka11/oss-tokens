@@ -56,7 +56,7 @@ try {
     const { findTasks } = await import('./tasks.js');
     const { basicMachine } = await import('./machine.js');
     const config = loadConfig();
-    const { tasks, skippedRepos, skippedForMachine } = await findTasks(new GitHub(config.github_token), {
+    const { tasks, skippedRepos, skippedForMachine, skippedDone } = await findTasks(new GitHub(config.github_token), {
       languages: flags.language ? [flags.language] : config.languages,
       taskTypes: config.task_types,
       repo: flags.repo || null,
@@ -66,6 +66,7 @@ try {
     if (!tasks.length) console.log('No open tasks match right now.');
     for (const t of tasks) console.log(`${t.repo}#${t.issue}  [${t.task_type}${t.needs.length ? `, needs ${t.needs.join('+')}` : ''}]  ${t.title}\n  ${t.url}`);
     if (skippedForMachine) console.log(`(${skippedForMachine} hidden: they need hardware this machine doesn't have)`);
+    if (skippedDone) console.log(`(${skippedDone} hidden: a result is already posted)`);
     for (const [repo, why] of Object.entries(skippedRepos)) console.log(`(skipped ${repo}: ${why})`);
   } else if (command === 'status') {
     const { loadConfig, loadState, dataDir } = await import('./config.js');

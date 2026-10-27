@@ -2,6 +2,14 @@
 import { TASK_TYPES } from './config.js';
 import { fetchRepoConfig } from './repo-config.js';
 import { NEED_TAGS, unmetNeeds } from './machine.js';
+import { markerKind } from './claims.js';
+
+// Who already posted an oss-tokens result on this issue.
+export function resultsIn(comments) {
+  return comments
+    .filter(c => markerKind(c.body) === 'result' && c.user?.login)
+    .map(c => ({ login: c.user.login, url: c.html_url, created_at: c.created_at }));
+}
 
 export const TASK_LABEL = 'ai-help-wanted';
 const LANG_RE = /^[A-Za-z0-9+#.\- ]{1,40}$/;
@@ -45,6 +53,26 @@ export function repoSearchQuery(repo, text, state = 'all') {
   return `${parts.join(' ')} ${terms}`;
 }
 
+// Best fit first, with the reasons, so the agent can propose one task
+// instead of making the user read a list. Plain rules, no model judgment:
+// - hardware-tagged tasks this machine can run (few donors can do them)
+// - no discussion yet (nobody else is on it, less to read)
+// - the donor's task types, in the order they listed them
+// - newest activity breaks ties
+export function rankTasks(tasks, { taskTypes = TASK_TYPES } = {}) {
+  const scored = tasks.map(t => {
+    let score = 0;
+    const why = [];
+    if (t.needs?.length) { score += 3; why.push(`needs ${t.needs.join('+')}, which few donors have and this machine does`); }
+    if (t.comments === 0) { score += 1; why.push('no discussion yet'); }
+    const pref = taskTypes.indexOf(t.task_type);
+    if (pref >= 0) score += (taskTypes.length - pref) * 0.25;
+    if (pref === 0) why.push(`your first-choice task type (${t.task_type})`);
+    return { ...t, score, why };
+  });
+  return scored.sort((a, b) => b.score - a.score || new Date(b.updated_at) - new Date(a.updated_at));
+}
+
 export function repoOf(issue) {
   // repository_url looks like https://api.github.com/repos/owner/name
   return issue.repository_url.split('/repos/')[1];
@@ -63,7 +91,7 @@ export function buildQuery({ language, repo } = {}) {
 // Returns tasks from opted-in repos whose type the repo allows and the
 // donor wants. Repos without a valid config are reported, not hidden, so
 // maintainers can see why their label isn't picked up.
-export async function findTasks(gh, { languages = [], taskTypes = TASK_TYPES, repo = null, limit = 10, machine = null } = {}) {
+export async function findTasks(gh, { languages = [], taskTypes = TASK_TYPES, repo = null, limit = 10, machine = null, includeDone = false } = {}) {
   const queries = languages.length ? languages.map(language => buildQuery({ language, repo })) : [buildQuery({ repo })];
   const seen = new Map();
   for (const q of queries) {
@@ -76,6 +104,7 @@ export async function findTasks(gh, { languages = [], taskTypes = TASK_TYPES, re
   const tasks = [];
   const skippedRepos = {};
   let skippedForMachine = 0;
+  let skippedDone = 0;
   for (const issue of seen.values()) {
     if (tasks.length >= limit) break;
     const fullName = repoOf(issue);
@@ -92,16 +121,23 @@ export async function findTasks(gh, { languages = [], taskTypes = TASK_TYPES, re
       continue;
     }
     if (!cfg.config.allowed_tasks.includes(type)) continue;
+    // Only issues with comments can have a result; skip the lookup otherwise.
+    const done = issue.comments > 0 && gh.listComments ? resultsIn(await gh.listComments(fullName, issue.number)) : [];
+    if (done.length && !includeDone) {
+      skippedDone++;
+      continue;
+    }
     tasks.push({
       repo: fullName,
       issue: issue.number,
       title: issue.title,
       task_type: type,
       needs,
+      done_by: done.map(d => d.login),
       url: issue.html_url,
       comments: issue.comments,
       updated_at: issue.updated_at,
     });
   }
-  return { tasks, skippedRepos, skippedForMachine };
+  return { tasks: rankTasks(tasks, { taskTypes }), skippedRepos, skippedForMachine, skippedDone };
 }

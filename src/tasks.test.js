@@ -1,6 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { taskTypeOf, buildQuery, findTasks, needsOf, repoSearchQuery } from './tasks.js';
+import { taskTypeOf, buildQuery, findTasks, needsOf, repoSearchQuery, rankTasks } from './tasks.js';
+
+test('ranking: rare-hardware tasks, then quiet issues, then preferred types', () => {
+  const t = (issue, task_type, comments, needs = [], updated_at = '2026-10-01') => ({ issue, task_type, comments, needs, updated_at });
+  const ranked = rankTasks([
+    t(1, 'docs', 5),
+    t(2, 'repro', 0),
+    t(3, 'triage', 0, ['windows']),
+    t(4, 'repro', 4),
+    t(5, 'repro', 0, [], '2026-10-20'),
+  ], { taskTypes: ['repro', 'triage', 'docs'] });
+  assert.deepEqual(ranked.map(x => x.issue), [3, 5, 2, 4, 1]);
+  assert.match(ranked[0].why.join(), /needs windows/);
+  assert.deepEqual(ranked[1].why, ['no discussion yet', 'your first-choice task type (repro)']);
+});
 
 test('hardware needs come from ai-needs labels', () => {
   assert.deepEqual(needsOf({ labels: [{ name: 'ai-needs:windows' }, { name: 'ai-needs:cuda' }, { name: 'ai-needs:quantum' }, { name: 'bug' }] }), ['windows', 'cuda']);
@@ -36,6 +50,25 @@ test('only opted-in repos and allowed task types come back', async () => {
   const { tasks, skippedRepos } = await findTasks(gh, { taskTypes: ['repro', 'docs'] });
   assert.deepEqual(tasks.map(t => `${t.repo}#${t.issue}`), ['in/repo#1']);
   assert.ok(skippedRepos['out/repo']);
+});
+
+test('tasks that already have a result are hidden unless asked for', async () => {
+  const issue = (number, comments) => ({
+    repository_url: 'https://api.github.com/repos/in/repo', number, title: `t${number}`, html_url: `u${number}`, comments,
+    labels: [{ name: 'ai-help-wanted' }, { name: 'ai:repro' }],
+  });
+  let lookups = 0;
+  const gh = {
+    searchIssues: async () => ({ items: [issue(1, 2), issue(2, 0)] }),
+    getFile: async () => 'ai_help: true',
+    listComments: async () => { lookups++; return [{ user: { login: 'amy' }, body: '<!-- oss-tokens:result v1 -->', html_url: 'c' }]; },
+  };
+  const hidden = await findTasks(gh, { taskTypes: ['repro'] });
+  assert.deepEqual(hidden.tasks.map(t => t.issue), [2]);
+  assert.equal(hidden.skippedDone, 1);
+  assert.equal(lookups, 1); // issues without comments aren't looked up
+  const all = await findTasks(gh, { taskTypes: ['repro'], includeDone: true });
+  assert.deepEqual(all.tasks.find(t => t.issue === 1).done_by, ['amy']);
 });
 
 test('tasks needing other hardware are hidden and counted', async () => {
